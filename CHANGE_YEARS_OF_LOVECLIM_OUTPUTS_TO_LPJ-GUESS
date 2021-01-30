@@ -1,0 +1,30 @@
+
+$Env:Path = "G:\nco;C:\Program Files (x86)\netCDF 4.6.1\bin"
+$inputFile = "G:\Dropbox\"
+$outputFile = "G:\Dropbox\"
+$ncflintOffset = "G:\Dropbox\"
+$ncflintFile = "G:\Dropbox\"
+$yearsToDays = -365;
+$april_days = 105;
+$monthToDays = $april_days;
+ncks -C -x -v TAXI_bnds,LAT_bnds -O $inputFile $outputFile
+ncrename -v TAXI,Time -O $outputFile
+ncrename -d TAXI,Time -O $outputFile 
+ncatted -a units,Time,o,c,'days since 1975-01-01 00:00:00' -O $outputFile $outputFile
+ncatted -a calendar,Time,o,c,'365_day' -O $outputFile $outputFile
+ncatted -a long_name,Time,c,c,'Time' -O $outputFile $outputFile
+ncatted -a time_origin,Time,d,c,' ' -O $outputFile
+ncatted -a bounds,Time,d,c,' ' -O $outputFile
+ncrename -v LON,Lon -O $outputFile $outputFile
+ncrename -d LON,Lon -O $outputFile $outputFile
+ncatted -a long_name,Lon,c,c,'longitude' -O $outputFile $outputFile
+-O $outputFile $outputFile
+ncrename -d LAT,Lat -O $outputFile $outputFile
+ncatted -a long_name,Lat,c,c,'latitude' -O $outputFile
+ncrename -v PRECIP_APR,prec -O $outputFile $outputFile
+ncatted -a long_name,prec,o,c,'precipitation_amount' -O $outputFile $outputFile
+ncatted -a standard_name,prec,c,c,'precipitation_amount' -O $outputFile $outputFile
+ncap2 -O -s 'Time=Time -584.4555555555555;' $outputFile $ncflintOffset;
+ncflint -A -w $yearsToDays,0 -v Time,Time $ncflintOffset $ncflintOffset $ncflintFile
+ncks -A -v Time $ncflintFile $outputFile
+ncap2 -O -s 'Time=Time + $monthToDays;' $outputFile $outputFile;
