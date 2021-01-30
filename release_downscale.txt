@@ -1,0 +1,29 @@
+
+for type in "insol" "prec" "temp"
+do
+echo -e "\n@ta" $type"\n"
+	
+for year in {1775..1974}
+
+do
+
+cruncep="../../LPJ_CLIMATE_INPUTS/cruncepv5_monthly_climatology_temp.nc"
+
+loveclim_dir="../../split/"
+
+loveclim="${type}_ta_${year}.nc"
+
+output_dir="../output/"
+	
+output_temp="${type}_scaled_${year}_temp.nc"
+
+output="${type}_scaled_${year}.nc"
+
+ncremap --algorithm='conservative' -i $loveclim_dir$loveclim -d $cruncep -o $output_dir$output_temp
+
+ncrename --overwrite -v lat,Lat -v lon,Lon $output_dir$output_temp
+ncks --open_ram --no_tmp_fl --overwrite -C -x -v area,frac_b,gw,lat_bnds,lon_bnds $output_dir$output_temp $output_dir$output
+
+rm $output_dir$output_temp
+
+done
