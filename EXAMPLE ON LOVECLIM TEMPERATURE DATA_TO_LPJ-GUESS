@@ -1,0 +1,71 @@
+
+$Env:Path = "G:\nco;C:\Program Files (x86)\netCDF 4.6.1\bin"
+$data_directory = "G:\Dropbox\Tobias_working_files\"; # note: these directories must exist
+$month_abbr = "", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC";
+$days_in_month = 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31;
+$days_to_mid_month = 0, 15, 45, 74, 105, 135, 166, 196, 227, 258, 288, 319, 349;
+$yearsToDays = -365.0;
+foreach ($month in 1..12)
+{
+Write-Host("Processing", $month_abbr[$month]);
+$monthToDays = $days_to_mid_month[$month];
+$data_merged_folder = "data_temp\merged\"; 
+$data_output_folder = "data_temp\output\"; 
+$data_temp_folder = "data_temp\temp\";    
+$input_filename_stem = "SAT_" + $month_abbr[$month];
+$output_filename_stem = "temp_" + $month_abbr[$month];
+$inputFile = $data_directory + $input_filename_stem + ".nc";
+$outputFile = $data_directory + $data_output_folder + $output_filename_stem  + ".nc";
+$timeOffsetFile = $data_directory + $data_temp_folder + $output_filename_stem   + "_timeOffset_temp.nc";
+$monthOffsetFile = $data_directory + $data_temp_folder + $output_filename_stem   + "_monthOffset_temp.nc";
+$ncflintFile = $data_directory + $data_temp_folder + $output_filename_stem  + "_ncflint_temp.nc";
+$retimeFile = $data_directory + $data_temp_folder + $output_filename_stem  + "_retime_temp.nc";
+ncrename -v LON,Lon -O $inputFile $outputFile
+ncrename -d LON,Lon -O $outputFile $outputFile
+ncatted -a long_name,Lon,c,c,'longitude' -O $outputFile $outputFile
+ncrename -v LAT,Lat -O $outputFile $outputFile
+ncrename -d LAT,Lat -O $outputFile $outputFile
+ncatted -a long_name,Lat,c,c,'latitude' -O $outputFile
+$variable_name = $input_filename_stem;
+ncrename -v $variable_name,temp -O $outputFile $outputFile
+ncatted -a long_name,temp,o,c,'air_temperature' -O $outputFile $outputFile
+ncatted -a standard_name,temp,c,c,'air_temperature' -O $outputFile $outputFile
+ncap2 -O -s 'temp=temp +273.15;' $outputFile $outputFile;
+ncatted -a units,temp,o,c,'K' -O $outputFile $outputFile
+
+If (Test-Path "${outputFile}"){
+	Remove-Item "${outputFile}"
+}
+ncks -C -x -v TAXI_bnds,LAT_bnds -O $outputFile -o "${outputFile}"
+mv -Force "${outputFile}" $outputFile
+ncrename -v TAXI,Time -O $outputFile
+ncrename -d TAXI,Time -O $outputFile 
+ncatted -a units,Time,o,c,'days since 1775-01-01 00:00:00' -O $outputFile $outputFile
+ncatted -a calendar,Time,o,c,'365_day' -O $outputFile $outputFile
+ncatted -a long_name,Time,c,c,'Time' -O $outputFile $outputFile
+ncatted -a time_origin,Time,d,c,' ' -O $outputFile
+ncatted -a bounds,Time,d,c,' ' -O $outputFile
+ncap2 -O -s 'Time=Time -784.4555555555555;' $outputFile $timeOffsetFile;
+ncflint -A -w $yearsToDays,0 -v Time,Time $timeOffsetFile $timeOffsetFile $ncflintFile
+ncap2 -O -s "Time=Time + $monthToDays;" $ncflintFile $monthOffsetFile;
+ncks -A -v Time $monthOffsetFile $outputFile
+}
+
+Write-Host("Merging");
+$output_directory = "data_temp\output\";
+$merged_directory = "data_temp\merged\";
+$output_filename_stem = "temp_";
+$mergedOutputFile = "${data_directory}${merged_directory}${output_filename_stem}merged.nc";
+$sortedOutputFile = "${data_directory}${merged_directory}${output_filename_stem}sorted.nc";
+$conclusionOutputFile =  "${data_directory}${merged_directory}${output_filename_stem}conclusion.nc";
+$sortedFiles = "";
+foreach ($mon in $month_abbr[1..12]){
+    $sortedFiles += "${data_directory}${output_directory}${output_filename_stem}${mon}.nc "
+}
+Invoke-Expression "ncra -O --mro $sortedFiles -o $mergedOutputFile"
+Write-Host("Sorting");
+Invoke-Expression "ncap2 -O -v -s 'Time=asort(Time,&srt_map);srt_map_3d=(0*int(temp))+srt_map;srt_map_3d*=`$Lat.size*`$Lon.size;lon_idx=array(0,1,`$Lon);lat_idx=array(0,1,`$Lat)*`$Lon.size;lat_lon_idx[`$Lat,`$Lon]=lat_idx+lon_idx;srt_map_3d+=lat_lon_idx;temp=remap(temp,srt_map_3d);' $mergedOutputFile $sortedOutputFile"
+Invoke-Expression "ncks -O -C -x -v lat_idx,lat_lon_idx,lon_idx,srt_map,srt_map_3d $sortedOutputFile $conclusionOutputFile"
+cp $conclusionOutputFile "G:\Dropbox\Tommy\Farzin\LPJ_guess_4.0.1\LPJ_guess_4.0.1\ta_working_directory\temp.nc"
+Write-Host("Completed: ", $conclusionOutputFile);
+Write-Host("Copied to: ", "G:\Dropbox\Tommy\Farzin\LPJ_guess_4.0.1\LPJ_guess_4.0.1\ta_working_directory\temp.nc");
