@@ -1,0 +1,54 @@
+
+import zipfile;
+import xarray;
+import numpy;
+import os;
+import warnings;
+
+def main():
+    input_filename_zip = 'G:/';
+    output_filename_zip = 'G:/';
+    
+    is_plotting = False; 
+    
+    adjustment_value = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0];
+    
+    with zipfile.ZipFile(input_filename_zip, 'r') as input_zip, zipfile.ZipFile(output_filename_zip, 'w', zipfile.ZIP_DEFLATED) as output_zip:
+        infolist = input_zip.infolist();
+        
+        output_zip.writestr(infolist[0].filename, '');
+    
+        for file_number in range(1, 201):
+            input_filename = infolist[file_number].filename;
+            print(input_filename);
+            
+            with input_zip.open(input_filename) as current_file:                    
+                INPUT_DATASET = xarray.open_dataset(current_file);
+                precipitation = INPUT_DATASET.prec;
+    
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    annual_precipitation = precipitation.mean(dim='Time');
+                if is_plotting: annual_precipitation.plot.contourf(levels=numpy.arange(0,500));
+            
+                months = precipitation.Time;
+            
+                output_precipitation = xarray.full_like(precipitation, float('nan'));
+            
+                for month in range(0, 11):
+                    output_precipitation.loc[months[month]] = annual_precipitation * adjustment_value[month];
+                    if is_plotting: output_precipitation.loc[months[month]].plot.contourf(levels=numpy.arange(0,500));
+                
+                OUTPUT_DATASET = xarray.full_like(INPUT_DATASET, float('NaN'));
+            
+                OUTPUT_DATASET['prec'] = output_precipitation;
+                
+                if is_plotting: OUTPUT_DATASET['prec'].loc[months[7]].plot.contourf(levels=numpy.arange(0,500));
+                
+                OUTPUT_DATASET.to_netcdf("temp");
+                output_zip.write("temp", infolist[file_number].filename);
+    
+    os.remove("temp");
+    
+if __name__ == '__main__':
+    main()
